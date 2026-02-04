@@ -1,44 +1,76 @@
 Hướng Dẫn Chạy Nhanh (Tiếng Việt)
 
-Mục tiêu: Chạy pipeline dự báo TC_HOÀN THÀNH và (tuỳ chọn) tune tham số cho LightGBM/CatBoost/XGBoost.
+Project này **chỉ dùng XGBoost** để dự đoán số tín chỉ hoàn thành.
 
-Yêu cầu
+Luồng chuẩn:
 
-- Python 3.9 trở lên
-- Đã có 3 file dữ liệu trong thư mục data/: admission.csv, academic_records.csv, test.csv
+1. Chạy notebook `training.ipynb` để tạo/kiểm tra `best_params_xgboost.json` và sinh thử `submissionn.csv`.
+2. Chạy app Streamlit `streamlit_app.py` để upload CSV → predict → download CSV (kèm ghi chú SHAP).
 
-Cài đặt
+## Yêu cầu
 
-1. Tạo môi trường ảo (khuyến nghị, PowerShell):
+- Python 3.9+ (khuyến nghị 3.10/3.11)
+- Có sẵn 3 file dữ liệu trong `data/`:
+  - `data/academic_records.csv`
+  - `data/admission.csv`
+  - `data/test.csv`
+
+## Cài đặt
+
+PowerShell (Windows):
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-```
-
-2. Cài thư viện:
-
-```powershell
 pip install -r requirements.txt
 ```
 
+## Bước 1 — Chạy notebook training
 
+Mở và chạy notebook:
 
-Tune tham số (Optuna)
+- File: `training.ipynb`
+- Notebook sẽ:
+  - Dùng `pipeline.build_main_df()` để tạo feature engineering (đồng bộ với app)
+  - (Tuỳ chọn) tune XGBoost bằng Optuna và lưu `best_params_xgboost.json`
+  - Train final model và xuất `submissionn.csv` từ `data/test.csv`
 
-- Tối ưu RMSE cho từng mô hình; lưu tham số tốt nhất vào các file: best_params_lightgbm.json, best_params_catboost.json, best_params_xgboost.json. Tóm tắt phiên chạy lưu ở tuning_results.json.
+Gợi ý biến môi trường (tuỳ chọn):
+
+- `N_TRIALS`: số lần thử Optuna (mặc định 30)
+- `USE_CUDA=1`: bật GPU nếu XGBoost hỗ trợ CUDA
+- `VALID_HK`: học kỳ dùng làm validation (mặc định `HK2 2023-2024`)
+
+Ví dụ chạy JupyterLab:
 
 ```powershell
-python tune.py
+jupyter lab
 ```
 
-Sau khi tune, chạy lại `python main.py` để tự động nạp tham số tốt nhất (nếu file best*params*\*.json tồn tại).
+Sau khi chạy xong, bạn sẽ có:
 
+- `best_params_xgboost.json` (nếu bạn chạy cell Optuna)
+- `submissionn.csv`
 
-Chạy pipeline dự báo (mặc định dùng tách theo thời gian)
-ư
-- Chạy huấn luyện và xuất dự báo cho 3 mô hình (LightGBM/CatBoost/XGBoost). Kết quả lưu ra các file: submission_lightgbm.csv, submission_catboost.csv, submission_xgboost.csv.
+## Bước 2 — Chạy Streamlit app
+
+App nhận file CSV giống format `data/test.csv`.
+
+- Input tối thiểu cần 2 cột:
+  - `MA_SO_SV`
+  - `TC_DANGKY`
+- `HOC_KY` là tuỳ chọn
+
+Output khi download CSV:
+
+- `PRED_PASS_RATE`: tỷ lệ hoàn thành dự đoán
+- `PRED_TC_HOANTHANH`: số tín chỉ hoàn thành dự đoán
+- `GHI_CHU_SHAP`: ghi chú giải thích top feature ảnh hưởng theo SHAP
+
+Chạy app:
 
 ```powershell
-python main.py
+streamlit run streamlit_app.py
 ```
+
+Lưu ý: App sẽ tự load `data/*.csv`, train model theo `best_params_xgboost.json` (nếu có) và tính SHAP để tạo cột ghi chú.
